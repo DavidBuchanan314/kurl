@@ -1,6 +1,6 @@
 from scapy.layers.tls.all import *
 import scapy.layers.tls.handshake
-from cryptography.hazmat.primitives.asymmetric.ec import ECDH
+from cryptography.hazmat.primitives.asymmetric.ec import ECDH, derive_private_key, SECP256R1
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from typing import Tuple
 import socket
@@ -31,10 +31,14 @@ class TLSClient:
 		server_hello = TLS13ServerHello(record)
 		server_hello.show()
 
-		server_keyshare = next(x for x in server_hello.ext if type(x) is TLS_Ext_KeyShare_SH)
+		server_keyshare: TLS_Ext_KeyShare_SH = next(x for x in server_hello.ext if type(x) is TLS_Ext_KeyShare_SH)
 		server_dh_pub = server_keyshare.server_share.pubkey
 		dh_secret = self.keyshare.privkey.exchange(ECDH(), server_dh_pub)
 		print("dh secret:", dh_secret.hex())
+
+		# by setting our privkey to 1, we turned ECDH into a nop
+		assert(server_keyshare.server_share.key_exchange[1:32+1] == dh_secret)
+
 
 		H0 = bytes(self.transcript.digest_size)
 		early_secret = hkdf_extract(H0, H0)
@@ -179,6 +183,8 @@ class TLSClient:
 
 	def client_hello(self):
 		self.keyshare = KeyShareEntry() # defaults to secp256r1
+		self.keyshare.privkey = derive_private_key(1, SECP256R1()) # set a weak key!!!
+		self.keyshare.key_exchange = self.keyshare.privkey.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
 		hello = TLS13ClientHello(
 			random_bytes=b"A"*32,
 			ciphers=[TLS_AES_128_GCM_SHA256],

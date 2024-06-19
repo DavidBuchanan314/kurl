@@ -31,6 +31,8 @@ No *user-space* dependencies means no external libraries, but it does mean we ca
 
 These APIs *should* offer everything we need to implement HTTPS "from scratch".
 
+In case it wasn't already obvious, the code I write here isn't going to be "secure" by any stretch of the imagination. My goal is simply to retrieve a URL, I don't care about confidentiality or integrity, and I will cut as many corners as I can. I'm only using HTTPS because it's 2024 and nobody serves HTTP anymore.
+
 ## Initial Prototyping
 
 I'd never used the ktls or kernel crypto APIs before, and they're not terribly well documented. Rather than diving in with a code-golfed C implementation, I started off with a "simple" proof-of-concept in Python, which you can see in `python_prototype/`. The goal here was to understand the APIs, figure out the main "business logic" requirements, and provide test/reference values for the inevitable debugging of the final version of the program.
@@ -54,3 +56,7 @@ For reference, my python *source* code currently weighs in at about 10KB (includ
 The goal for this prototype is to concretely implement everything in C, including understanding the other non-ktls kernel crypto APIs, and implementing TLS record parsing logic myself (replacing scapy).
 
 This will act as a more readable and debuggable program, acting as a stepping stone to the final golfed version.
+
+It was at this point that I realised that the crypto UAPIs don't currently support secp256r1 or any other KPP ("Key-agreement Protocol Primitives"). I wonder... if I set my private key to the scalar value "1", then deriving the shared secret from the server's DH share should be trivial (it's just the X coordinate). Will it work?
+
+Turns out, yes it does!!!! This obviously completely breaks the security of the protocol, but it means our implementation of ECDH can effectively become a nop.
