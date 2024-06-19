@@ -2,7 +2,7 @@
 
 This is repo hosts my WIP entry to [BGGP5](#TODO). This README acts as a dev log of sorts.
 
-The main goal of BGGP5 is to download the file at [https://binary.golf/5/5](https://binary.golf/5/5) and display its contents, all using less than 4KB of code (stored in whatever format you like).
+The main goal of BGGP5 is to download the file at [https://binary.golf/5/5](https://binary.golf/5/5) and display its contents, using less than 4KB of code (stored in whatever format you like).
 
 *My* goal is to create the smallest possible HTTPS client as a static Linux ELF binary. I don't yet know if that's possible, within the 4KB constraint! I'll definitely have to cut corners to make it work, especially in the security department.
 
@@ -37,7 +37,7 @@ I'd never used the ktls or kernel crypto APIs before, and they're not terribly w
 
 ### Kernel TLS
 
-Kernel TLS is a very promising idea, on the surface it sounds like it solves all our problems at once. Sadly, this isn't the case (turns out it wasn't designed to aid code golfers). To oversimplify, TLS has two phases: the handshake (which negotiates parameters and uses asymmetric crypto to establish symmetric session keys), and then the rest of the session that transports the encrypted application-layer traffic. The kernel only assists us with the second half, so we need to do the handshake phase all by ourselves.
+Kernel TLS is a very promising idea, on the surface it sounds like it solves all our problems at once. But, there's a sizeable caveat. To oversimplify, TLS has two phases: the handshake (which negotiates parameters and uses asymmetric crypto to establish symmetric session keys), and then the rest of the session that transports the encrypted application-layer traffic. The kernel only assists us with the second half, so we need to do the handshake phase all by ourselves.
 
 After many hours of hacking away, I got my prototype to work. I used Scapy to handle the parsing and serialisation of TLS records, python libraries for the handshake crypto, and finally the kernel TLS apis to encrypt/decrypt the session traffic.
 
