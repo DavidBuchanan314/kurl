@@ -121,6 +121,8 @@ class TLSClient:
 		)
 		s.sendmsg([bytes(TLSFinished(vdata=verify_data))], [(linux_ktls.SOL_TLS, linux_ktls.TLS_SET_RECORD_TYPE, (22).to_bytes())])
 		"""
+
+		print("tlsfinished raw", bytes(TLSFinished(vdata=verify_data)))
 		
 		msg = bytes(TLS13(
 			type=23,
