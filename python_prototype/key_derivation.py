@@ -30,4 +30,5 @@ def hkdf_expand(prk: bytes, info: bytes, length: int) -> bytes:
 def hkdf_expand_label(secret, label, context, length: int):
     label_str = b"tls13 " + label
     hkdf_label = length.to_bytes(2, "big") + len(label_str).to_bytes() + label_str + len(context).to_bytes() + context
+    print("hkdf_expand", hkdf_label, len(hkdf_label))
     return hkdf_expand(secret, hkdf_label, length)

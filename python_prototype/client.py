@@ -53,7 +53,7 @@ class TLSClient:
 		# bleh I can't get it to work... hardcoding from https://crypto.stackexchange.com/a/68668
 		#derived_secret = bytes.fromhex("6f2615a108c702c5678f54fc9dbab69716c076189c48250cebeac3576c3611ba")
 		# ah, fixed it now... (hkdf_expand_label was broken)
-		print("derived secret:", derived_secret.hex()) # also constant!
+		print("derived secret:", derived_secret.hex(), c_dump(derived_secret)) # also constant!
 
 		handshake_secret = hkdf_extract(derived_secret, dh_secret)
 		print("handshake secret:", handshake_secret.hex())
