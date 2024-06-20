@@ -78,17 +78,6 @@ void *memcpy(void * restrict dst, const void * restrict src, size_t n)
 	return dst;
 }
 
-void *memset(void * restrict dst, int c, size_t n)
-{
-	char *d = dst;
-	for (size_t i=0; i<n; i++) {
-		d[i] = c;
-	}
-	return dst;
-}
-
-
-
 char *strcpy(char * restrict dst, const char * restrict src)
 {
 	size_t i = 0;

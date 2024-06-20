@@ -70,3 +70,55 @@ It just occurred to me that I'm also going to be responsible for DNS resolution.
 ### Compression
 
 As an aside, it would be nice to be able to utilise compression in some way. Since we have no userspace dependencies, we could in theory pack a custom linux initramfs (a compressed cpio archive) with our executable as the init binary. The main caveat would be getting the kernel to set up its own networking stack properly, which I *think* it can do, with the right kernel commandline options.
+
+## Golfing
+
+Right now, the executable weighs in at 200KB when compiled on aarch64, and 17KB on x86-64.
+
+The aarch64 build is so large because the sections are padded out to 64k boundaries, compared to 4k on x86. But even if I gzip it (which I use as a very lazy proxy for ignoring all the padding), it's still 6.5KB. Clearly, there's a lot of golfing left to do. A lot of the cruft is going to be coming from dynamicly linking with glibc. Let's remove the glibc dependency, compile to a static ELF, and do bare syscalls with [LSS](https://chromium.googlesource.com/linux-syscall-support).
+
+With this technique, a "hello world" binary weighs in at 512 bytes:
+
+```
+$ gcc kurl.c -o kurl -ffreestanding -nostdlib -static -Os -N -s -fcf-protection=none -Wl,--build-id=none -fomit-frame-pointer -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector
+$ hexdump -vC kurl
+00000000  7f 45 4c 46 02 01 01 00  00 00 00 00 00 00 00 00  |.ELF............|
+00000010  02 00 b7 00 01 00 00 00  b0 00 40 00 00 00 00 00  |..........@.....|
+00000020  40 00 00 00 00 00 00 00  00 01 00 00 00 00 00 00  |@...............|
+00000030  00 00 00 00 40 00 38 00  02 00 40 00 04 00 03 00  |....@.8...@.....|
+00000040  01 00 00 00 07 00 00 00  b0 00 00 00 00 00 00 00  |................|
+00000050  b0 00 40 00 00 00 00 00  b0 00 40 00 00 00 00 00  |..@.......@.....|
+00000060  37 00 00 00 00 00 00 00  37 00 00 00 00 00 00 00  |7.......7.......|
+00000070  04 00 00 00 00 00 00 00  51 e5 74 64 06 00 00 00  |........Q.td....|
+00000080  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000090  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+000000a0  00 00 00 00 00 00 00 00  10 00 00 00 00 00 00 00  |................|
+000000b0  01 00 00 90 20 00 80 d2  21 60 03 91 c2 01 80 d2  |.... ...!`......|
+000000c0  08 08 80 d2 01 00 00 d4  00 00 80 d2 a8 0b 80 d2  |................|
+000000d0  01 00 00 d4 c0 03 5f d6  48 65 6c 6c 6f 2c 20 77  |......_.Hello, w|
+000000e0  6f 72 6c 64 21 0a 00 00  2e 73 68 73 74 72 74 61  |orld!....shstrta|
+000000f0  62 00 2e 74 65 78 74 00  2e 64 61 74 61 00 00 00  |b..text..data...|
+00000100  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000120  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000130  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000140  0b 00 00 00 01 00 00 00  07 00 00 00 00 00 00 00  |................|
+00000150  b0 00 40 00 00 00 00 00  b0 00 00 00 00 00 00 00  |..@.............|
+00000160  28 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |(...............|
+00000170  04 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000180  11 00 00 00 01 00 00 00  03 00 00 00 00 00 00 00  |................|
+00000190  d8 00 40 00 00 00 00 00  d8 00 00 00 00 00 00 00  |..@.............|
+000001a0  0f 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+000001b0  01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+000001c0  01 00 00 00 03 00 00 00  00 00 00 00 00 00 00 00  |................|
+000001d0  00 00 00 00 00 00 00 00  e7 00 00 00 00 00 00 00  |................|
+000001e0  17 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+000001f0  01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000200
+```
+
+Adding back the rest of the code, porting things as neccessary (memcpy, etc. need reimplementing), results in a 3776 byte binary (compiling for aarch64).
+
+That's a TLS client in under 4KB!!!!
+
+We've even got 320 bytes left for a DNS client.
