@@ -9,6 +9,9 @@ import hashlib
 from key_derivation import *
 import ktls
 
+def c_dump(data):
+	return ",".join(f"0x{n:02x}" for n in data)
+
 class TLSClient:
 	"""
 	XXX: This is NOT A SECURE IMPLEMENTATION
@@ -34,6 +37,7 @@ class TLSClient:
 		server_keyshare: TLS_Ext_KeyShare_SH = next(x for x in server_hello.ext if type(x) is TLS_Ext_KeyShare_SH)
 		server_dh_pub = server_keyshare.server_share.pubkey
 		dh_secret = self.keyshare.privkey.exchange(ECDH(), server_dh_pub)
+		print("server keyshare:", server_keyshare.server_share.key_exchange.hex())
 		print("dh secret:", dh_secret.hex())
 
 		# by setting our privkey to 1, we turned ECDH into a nop
@@ -185,6 +189,7 @@ class TLSClient:
 		self.keyshare = KeyShareEntry() # defaults to secp256r1
 		self.keyshare.privkey = derive_private_key(1, SECP256R1()) # set a weak key!!!
 		self.keyshare.key_exchange = self.keyshare.privkey.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+		print("client key share:", self.keyshare.key_exchange.hex())
 		hello = TLS13ClientHello(
 			random_bytes=b"A"*32,
 			ciphers=[TLS_AES_128_GCM_SHA256],
@@ -219,11 +224,11 @@ class TLSClient:
 			type=22,
 			inner=hello
 		)
-		assert(bytes(record) == bytes(record))
-		TLS13(bytes(record)).show()
+		assert(bytes(record) == bytes(record)) # check serialisation is consistent... (random_bytes must be set, apparently)
 		foo = bytes(record)
-		assert(bytes(hello) == foo[5:])
-		self.transcript.update(foo[5:]) # hmmmmmm seems like the serialisation is different every time? (ok it was because I didn't set random_bytes)
+		print(f"static const unsigned char CLIENT_HELLO[] = {{{c_dump(foo)}}};")
+		TLS13(foo).show()
+		self.transcript.update(foo[5:])
 		self.s.sendall(foo)
 
 if __name__ == "__main__":

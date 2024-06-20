@@ -57,6 +57,16 @@ The goal for this prototype is to concretely implement everything in C, includin
 
 This will act as a more readable and debuggable program, acting as a stepping stone to the final golfed version.
 
-It was at this point that I realised that the crypto UAPIs don't currently support secp256r1 or any other KPP ("Key-agreement Protocol Primitives"). I wonder... if I set my private key to the scalar value "1", then deriving the shared secret from the server's DH share should be trivial (it's just the X coordinate). Will it work?
+### secp256r1 woes
 
-Turns out, yes it does!!!! This obviously completely breaks the security of the protocol, but it means our implementation of ECDH can effectively become a nop.
+It was at this point that I realised that the crypto UAPIs don't currently support secp256r1 or any other KPPs ("Key-agreement Protocol Primitives"). I wonder... if I set my private key to the scalar value "1", then deriving the shared secret from the server's DH share should be trivial (it's just the X coordinate). Will it work?
+
+Turns out, yes it does!!! This obviously completely breaks the security of the protocol, but it means our implementation of ECDH can effectively become a nop. I was worried that maybe servers would try to prevent this in the name of security, but apparently not (there isn't much you can do if the client is being uncooperative).
+
+### DNS
+
+It just occurred to me that I'm also going to be responsible for DNS resolution. I could hardcode an IP, but that would be a bit lame. I think I'll write my own basic DNS client. BUT, I'll start by hardcoding the IP.
+
+### Compression
+
+As an aside, it would be nice to be able to utilise compression in some way. Since we have no userspace dependencies, we could in theory pack a custom linux initramfs (a compressed cpio archive) with our executable as the init binary. The main caveat would be getting the kernel to set up its own networking stack properly, which I *think* it can do, with the right kernel commandline options.

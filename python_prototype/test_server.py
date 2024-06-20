@@ -18,8 +18,13 @@ if __name__ == "__main__":
 	server.listen(0)
 
 	while True:
-		connection, client_address = server.accept()
-		data = connection.recv(1024)
-		print(f"Received: {data}")
-		connection.sendall(b"echo " + data)
-		connection.close()
+		try:
+			print("Waiting for connection...")
+			connection, client_address = server.accept()
+			print(f"accepted TLS connection from {client_address}") # nb, we only get here after the handshake completes, afaik
+			data = connection.recv(1024)
+			print(f"Received: {data}")
+			connection.sendall(b"echo " + data)
+			connection.close()
+		except Exception as e:
+			print(e)
