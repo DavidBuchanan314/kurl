@@ -2077,11 +2077,7 @@ struct kernel_statx {
    */
   #define LSS_RETURN(type, res)                                               \
     do {                                                                      \
-      if ((unsigned long)(res) >= (unsigned long)(-4095)) {                   \
-        LSS_ERRNO = (int)(-(res));                                            \
-        res = -1;                                                             \
-      }                                                                       \
-      return (type) (res);                                                    \
+       return (type) (res);                                                    \
     } while (0)
   #elif defined(__mips__)
   /* On MIPS, failing system calls return -1, and set errno in a
