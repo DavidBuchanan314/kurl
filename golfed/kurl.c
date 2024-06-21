@@ -691,4 +691,5 @@ void _start(void)
 {
 	void **auxv = __builtin_frame_address(0) + 16; // XXX: you may need to tweak this!
 	sys__exit(main(*(int*)auxv, (char **)auxv+1)); 
+	__builtin_unreachable();
 }

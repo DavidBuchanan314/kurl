@@ -2922,6 +2922,16 @@ struct kernel_statx {
                                 : "x8", "memory");                            \
           __res = __res_x0;                                                   \
           LSS_RETURN(type, __res)
+    #define LSS_BODY_noret(type,name,args...)                                       \
+          register int64_t __res_x0 __asm__("x0");                            \
+          int64_t __res;                                                      \
+          __asm__ __volatile__ ("mov x8, %1\n"                                \
+                                "svc 0x0\n"                                   \
+                                : "=r"(__res_x0)                              \
+                                : "i"(__NR_##name) , ## args                  \
+                                : "x8", "memory");                            \
+          __res = __res_x0; \
+          __builtin_unreachable();
     #undef _syscall0
     #define _syscall0(type, name)                                             \
       type LSS_NAME(name)(void) {                                             \
@@ -2931,6 +2941,10 @@ struct kernel_statx {
     #define _syscall1(type, name, type1, arg1)                                \
       type LSS_NAME(name)(type1 arg1) {                                       \
         LSS_REG(0, arg1); LSS_BODY(type, name, "r"(__r0));                    \
+      }
+    #define _syscall1_noret(type, name, type1, arg1)                                \
+      type LSS_NAME(name)(type1 arg1) {                                       \
+        LSS_REG(0, arg1); LSS_BODY_noret(type, name, "r"(__r0));                    \
       }
     #undef _syscall2
     #define _syscall2(type, name, type1, arg1, type2, arg2)                   \
@@ -4107,7 +4121,7 @@ struct kernel_statx {
   #endif
   LSS_INLINE _syscall3(int,     execve,          const char*, f,
                        const char*const*,a,const char*const*, e)
-  LSS_INLINE _syscall1(int,     _exit,           int,         e)
+  LSS_INLINE __attribute__((noreturn)) _syscall1_noret(void,     _exit,           int,         e)
   LSS_INLINE _syscall1(int,     exit_group,      int,         e)
   LSS_INLINE _syscall3(int,     fcntl,           int,         f,
                        int,            c, long,   a)
