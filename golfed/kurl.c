@@ -1,4 +1,4 @@
-//#define DEBUG 1
+#define DEBUG 1
 
 // google dns
 #define DNS_SERVER 0x08080808
@@ -561,7 +561,7 @@ found_finished:
 	ktls_set_key(s, TLS_RX, &server_application_traffic);
 }
 
-int __attribute__ ((noinline)) main(int argc, char *argv[])
+static int __attribute__ ((noinline)) main(int argc, char *argv[])
 {
 	if (argc != 2) {
 show_usage:
