@@ -83,20 +83,20 @@ void *memcpy(void * restrict dst, const void * restrict src, size_t n)
 	return dst;
 }
 
+size_t strlen(const char *s)
+{
+	size_t i = 0;
+	while (s[i]) i++;
+	return i;
+}
+
 char *strcpy(char * restrict dst, const char * restrict src)
 {
 	size_t i = 0;
 	do {
 		dst[i] = src[i];
 	} while (src[i++]);
-	return dst;
-}
-
-size_t strlen(const char *s)
-{
-	size_t i = 0;
-	while (s[i]) i++;
-	return i;
+	return dst+i-1;
 }
 
 #undef CMSG_NXTHDR
@@ -126,10 +126,11 @@ static int alg_sock(const char *type, const char *name)
 {
 	algfd = sys_socket(AF_ALG, SOCK_SEQPACKET, 0); // actually we need a new one each time????
 	DBG_ASSERT(algfd >= 0);
-	struct sockaddr_alg sa = {
-		.salg_family = AF_ALG,
-	};
+	struct sockaddr_alg sa;
+	sa.salg_family = AF_ALG;
 	strcpy((char*)sa.salg_type, type);
+	sa.salg_mask = 0;
+	sa.salg_feat = 0;
 	strcpy((char*)sa.salg_name, name);
 	DBG_ASSERT(sys_bind(algfd, (struct sockaddr *)&sa, sizeof(sa)) == 0);
 	int res = sys_accept(algfd, NULL, 0);
@@ -159,20 +160,21 @@ static void hmac_sha256(unsigned char *res, unsigned char key[32], unsigned char
 static void hkdf_expand_label(unsigned char *res, unsigned char secret[32], char *label, unsigned char *ctx, size_t ctxlen, size_t len)
 {
 	// this is really gross and will need to be mostly rewritten when we ditch libc
-	unsigned char buf[0x100] = {0, len, 6+strlen(label), 't', 'l', 's', '1', '3', ' '};
-	size_t ptr = 2 + 1 + 6;
-	strcpy((char*)buf+ptr, label);
-	ptr += strlen(label);
-	buf[ptr++] = ctxlen;
-	memcpy(buf+ptr, ctx, ctxlen);
+	unsigned char buf[0x100];
+	buf[0] = 0;
+	buf[1] = len;
+	unsigned char *ptr = (unsigned char*)strcpy(strcpy((char*)buf+3, "tls13 "), label);
+	buf[2] = ptr-buf-3;
+	*ptr++ = ctxlen;
+	memcpy(ptr, ctx, ctxlen);
 	ptr += ctxlen;
 #ifdef DEBUG
 	//printf("hkdf_expand_label buf (len=%lu): ", ptr);
 	//hexdump(buf, ptr);
 	//printf("\n");
 #endif
-	buf[ptr++] = 1; // hkdf_expand counter suffix
-	hmac_sha256(res, secret, buf, ptr);
+	*ptr++ = 1; // hkdf_expand counter suffix
+	hmac_sha256(res, secret, buf, ptr-buf);
 }
 
 /* nb: this encrypts/decrypts "in place". length includes AD len, and tag len for decrypts */
@@ -241,9 +243,33 @@ static uint32_t do_dns(void)
 	DBG_ASSERT(sys_write(s, DNS_REQ, sizeof(DNS_REQ)) == sizeof(DNS_REQ));
 	DBG_ASSERT(sys_read(s, recvbuf, sizeof(recvbuf)) > 0);
 	uint32_t ip = *(uint32_t*)(recvbuf+41);  // assuming the DNS server uses compression, the first ipv4 addr will be at the same place for a given query response
+	// the "formula" is 30 + strlen(domain)
 	return ip;
 }
 
+/*
+this version is more correct (on the first read?), but takes like 40 extra bytes
+
+static void recvall(int s, unsigned char *buf, size_t len)
+{
+	size_t ptr = 0;
+	while (ptr < len)
+	{
+		size_t readlen = sys_read(s, buf+ptr, len - ptr);
+		DBG_ASSERT(readlen > 0); // XXX: will infinite loop on EOF!
+		ptr += readlen;
+	}
+	DBG_ASSERT(ptr == len);
+}
+
+static size_t recv_record(int s)
+{
+	recvall(s, recvbuf, 5);
+	ssize_t msglen = (recvbuf[3]<<8) + recvbuf[4];
+	recvall(s, recvbuf+5, msglen);
+	return 5 + msglen;
+}
+*/
 
 // receive the next record into recvbuf. does not account for record fragmentation.
 // returns number of bytes of recvbuf populated (includes header)
@@ -269,9 +295,11 @@ static void ktls_set_key(int s, int direction, unsigned char key[16], unsigned c
 		.info.cipher_type = TLS_CIPHER_AES_GCM_128,
 		.rec_seq = {0}
 	};
-	memcpy(crypto_info.iv, iv+4, 8);
+	//memcpy(crypto_info.iv, iv+4, 8);
+	*(uint64_t*)crypto_info.iv = *(uint64_t*)(iv+4);
 	memcpy(crypto_info.key, key, 16);
-	memcpy(crypto_info.salt, iv, 4);
+	//memcpy(crypto_info.salt, iv, 4);
+	*(uint32_t*)crypto_info.salt = *(uint32_t*)iv;
 	DBG_ASSERT(sys_setsockopt(s, SOL_TLS, direction, &crypto_info, sizeof(crypto_info)) == 0);
 }
 

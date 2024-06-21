@@ -1,10 +1,11 @@
 #include <stddef.h>
 
-void *memset(void * restrict dst, int c, size_t n)
+void *memcpy(void * restrict dst, const void * restrict src, size_t n)
 {
 	char *d = dst;
+	const char *s = src;
 	for (size_t i=0; i<n; i++) {
-		d[i] = c;
+		d[i] = s[i];
 	}
 	return dst;
 }
