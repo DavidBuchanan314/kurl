@@ -5,6 +5,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from typing import Tuple
 import socket
 import hashlib
+import io
 
 from key_derivation import *
 import ktls
@@ -84,15 +85,25 @@ class TLSClient:
 				continue
 			this_iv = (int.from_bytes(server_handshake_iv) ^ i).to_bytes(12)
 			pt = server_handshake_cipher.decrypt(this_iv, record, header_bytes)
-			assert(pt[-1] == 22)
 			i += 1
-			self.transcript.update(pt[:-1])
-			cls = scapy.layers.tls.handshake._tls13_handshake_cls.get(pt[0], Raw)
-			if cls is TLSFinished:
-				print(pt) # can't parse...
-				break
+			assert(pt[-1] == 22)
+			ptbuf = io.BytesIO(pt[:-1])
+			print(pt.hex())
+			while True:
+				rawtype = ptbuf.read(1)
+				rawlen = ptbuf.read(3)
+				msglen = int.from_bytes(rawlen, "big")
+				msg = ptbuf.read(msglen)
+				self.transcript.update(rawtype + rawlen + msg)
+				cls = scapy.layers.tls.handshake._tls13_handshake_cls.get(rawtype[0], Raw)
+				if cls is TLSFinished:
+					print(msg) # can't parse...
+					break
+				else:
+					print(repr(cls(rawtype + rawlen + msg, tls_session=server_hello.tls_session)))
 			else:
-				print(repr(cls(pt[:-1], tls_session=server_hello.tls_session)))
+				continue
+			break
 
 		master_secret = hkdf_extract(hkdf_expand_label(handshake_secret, b"derived", hashlib.sha256(b"").digest(), 32), H0)
 		print("master_secret:", master_secret.hex())
@@ -153,7 +164,7 @@ class TLSClient:
 		ktls.socket_set_key(s, ktls.TLS_TX, client_application_key, client_application_iv)
 		ktls.socket_set_key(s, ktls.TLS_RX, server_application_key, server_application_iv)
 
-		s.sendall(b"GET /stuff/ HTTP/1.1\r\nHost: retr0.id\r\nConnection: close\r\n\r\n")
+		s.sendall(f"GET / HTTP/1.1\r\nHost: {self.hostname}\r\nConnection: close\r\n\r\n".encode())
 
 		# this is messy (and overengineered) because we need to filter out non-application records.
 		# there's definitely room for simplification.
@@ -219,6 +230,7 @@ class TLSClient:
 					servernames=[
 						ServerName(servername=self.hostname)
 					]
+					#servernames=[ServerName(servername="google.com")]
 				),
 			]
 		)
@@ -238,6 +250,8 @@ if __name__ == "__main__":
 	port = 443
 	hostname = "localhost"
 	port = 1337
+	hostname = "cloudflare.com"
+	port = 443
 
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	s.connect((hostname, port))

@@ -137,3 +137,11 @@ Now that I'm comfortably below 4KB, I can think about some enhancements, my drea
 - dynamically inserting the hostname and path into the HTTP query
 - dynamically setting the SNI hostname in client_hello (this seems optional for the github pages host, but might not be optional elsewhere)
 - correct recvall logic (not a strict requirement but will increase compat)
+
+## Fixing Fragmentation
+
+With some sites, (notably google.com), the handshake hangs after a `encrypted_extensions(8)` message. I need to figure out why!
+
+Ok it looks like we're not handling record fragmentation properly.
+
+Google (and others) are sending some of their handshake responses bundled together within a single outer envelope. We need to iteratively parse records within the decrypted data, I think?
