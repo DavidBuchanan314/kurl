@@ -70,6 +70,12 @@ static size_t transcript_len = 0;
 
 static int algfd; //reusable? socket(AF_ALG, SOCK_SEQPACKET, 0);
 
+struct skiv {
+	unsigned char secret[32];
+	unsigned char key[32];
+	unsigned char iv[32];
+};
+
 
 /* begin mini libc impl */
 // TODO: figure out how to make this static...
@@ -171,11 +177,11 @@ static void hkdf_expand_label(unsigned char *res, unsigned char secret[32], char
 }
 
 /* nb: this encrypts/decrypts "in place". length includes AD len, and tag len for decrypts */
-static void aes_gcm(unsigned char *buf, int op, unsigned char key[16], unsigned char iv[12], size_t len, size_t adlen)
+static void aes_gcm(unsigned char *buf, int op, struct skiv *ski, size_t len, size_t adlen)
 {
 	int sfd = alg_sock("aead", "gcm(aes)");
 	sys_setsockopt(algfd, SOL_ALG, ALG_SET_AEAD_AUTHSIZE, NULL, 16);
-	sys_setsockopt(algfd, SOL_ALG, ALG_SET_KEY, key, 16);
+	sys_setsockopt(algfd, SOL_ALG, ALG_SET_KEY, ski->key, 16);
 
 	char cbuf[CMSG_SPACE(4) + CMSG_SPACE(4) + CMSG_SPACE(4+12)] = {0};
 	struct kernel_iovec iov = {
@@ -209,9 +215,8 @@ static void aes_gcm(unsigned char *buf, int op, unsigned char key[16], unsigned 
 	cmsg->cmsg_len = CMSG_LEN(4+12);
 	struct af_alg_iv *aiv = (void *)CMSG_DATA(cmsg);
 	aiv->ivlen = 12;
-	memcpy(aiv->iv, iv, 12);
+	memcpy(aiv->iv, ski->iv, 12);
 
-	// TODO: finish this!!!
 	DBG_ASSERT(sys_sendmsg(sfd, &msg, 0) >= 0);
 	ssize_t reslen = op == ALG_OP_ENCRYPT ? len + 16 : len - 16;
 	DBG_ASSERT(sys_read(sfd, buf, reslen) == reslen);
@@ -268,7 +273,7 @@ static size_t recv_record(int s)
 // returns number of bytes of recvbuf populated (includes header)
 static size_t recv_record(int s)
 {
-	ssize_t ptr = sys_read(s, recvbuf, 5);
+	ssize_t ptr = sys_read(s, recvbuf, 5); // TODO: make sure all bytes read?
 	DBG_ASSERT(ptr == 5);
 	ssize_t msglen = (recvbuf[3]<<8) + recvbuf[4] + 5;
 	while (ptr < msglen)
@@ -281,7 +286,7 @@ static size_t recv_record(int s)
 	return ptr;
 }
 
-static void ktls_set_key(int s, int direction, unsigned char key[16], unsigned char iv[12])
+static void ktls_set_key(int s, int direction, struct skiv *ski)
 {
 	struct tls12_crypto_info_aes_gcm_128 crypto_info = {
 		.info.version = TLS_1_3_VERSION,
@@ -289,11 +294,18 @@ static void ktls_set_key(int s, int direction, unsigned char key[16], unsigned c
 		.rec_seq = {0}
 	};
 	//memcpy(crypto_info.iv, iv+4, 8);
-	*(uint64_t*)crypto_info.iv = *(uint64_t*)(iv+4);
-	memcpy(crypto_info.key, key, 16);
+	*(uint64_t*)crypto_info.iv = *(uint64_t*)(ski->iv+4);
+	memcpy(crypto_info.key, ski->key, 16);
 	//memcpy(crypto_info.salt, iv, 4);
-	*(uint32_t*)crypto_info.salt = *(uint32_t*)iv;
+	*(uint32_t*)crypto_info.salt = *(uint32_t*)ski->iv;
 	DBG_ASSERT(sys_setsockopt(s, SOL_TLS, direction, &crypto_info, sizeof(crypto_info)) == 0);
+}
+
+static void derive_key_iv(struct skiv *ski, unsigned char seed[32], char *ctx, unsigned char transcript_hash[32])
+{
+	hkdf_expand_label(ski->secret, seed, ctx, transcript_hash, 32, 32);
+	hkdf_expand_label(ski->key, ski->secret, "key", NULL, 0, 16);
+	hkdf_expand_label(ski->iv, ski->secret, "iv", NULL, 0, 12);
 }
 
 static void tls13_handshake(int s)
@@ -359,12 +371,8 @@ static void tls13_handshake(int s)
 #endif
 
 	/* derive handshake encryption keys */
-	unsigned char client_handshake_traffic_secret[32];
-	unsigned char client_handshake_traffic_secret_key[32]; // nb: 16 byte really
-	unsigned char client_handshake_traffic_secret_iv[32]; // nb: 12 byte really
-	hkdf_expand_label(client_handshake_traffic_secret, handshake_secret, "c hs traffic", transcript_hash, 32, 32);
-	hkdf_expand_label(client_handshake_traffic_secret_key, client_handshake_traffic_secret, "key", NULL, 0, 16);
-	hkdf_expand_label(client_handshake_traffic_secret_iv, client_handshake_traffic_secret, "iv", NULL, 0, 12);
+	struct skiv client_handshake_traffic;
+	derive_key_iv(&client_handshake_traffic, handshake_secret, "c hs traffic", transcript_hash);
 #ifdef DEBUG
 	printf("client_handshake_traffic_secret: ");
 	hexdump(client_handshake_traffic_secret, sizeof(client_handshake_traffic_secret));
@@ -377,12 +385,8 @@ static void tls13_handshake(int s)
 	printf("\n");
 #endif
 
-	unsigned char server_handshake_traffic_secret[32];
-	unsigned char server_handshake_traffic_secret_key[32]; // nb: 16 byte really
-	unsigned char server_handshake_traffic_secret_iv[32]; // nb: 12 byte really
-	hkdf_expand_label(server_handshake_traffic_secret, handshake_secret, "s hs traffic", transcript_hash, 32, 32);
-	hkdf_expand_label(server_handshake_traffic_secret_key, server_handshake_traffic_secret, "key", NULL, 0, 16);
-	hkdf_expand_label(server_handshake_traffic_secret_iv, server_handshake_traffic_secret, "iv", NULL, 0, 12);
+	struct skiv server_handshake_traffic;
+	derive_key_iv(&server_handshake_traffic, handshake_secret, "s hs traffic", transcript_hash);
 #ifdef DEBUG
 	printf("server_handshake_traffic_secret: ");
 	hexdump(server_handshake_traffic_secret, sizeof(server_handshake_traffic_secret));
@@ -410,9 +414,9 @@ static void tls13_handshake(int s)
 		if (recvbuf[0] != 23) { // the handshake records we want are pretending to be application traffic
 			continue;
 		}
-		server_handshake_traffic_secret_iv[11] ^= recv_ctr; // xxx: assumes <256 messages!!!
-		aes_gcm(recvbuf, ALG_OP_DECRYPT, server_handshake_traffic_secret_key, server_handshake_traffic_secret_iv, record_len, 5);
-		server_handshake_traffic_secret_iv[11] ^= recv_ctr++;
+		server_handshake_traffic.iv[11] ^= recv_ctr; // xxx: assumes <256 messages!!!
+		aes_gcm(recvbuf, ALG_OP_DECRYPT, &server_handshake_traffic, record_len, 5);
+		server_handshake_traffic.iv[11] ^= recv_ctr++;
 #ifdef DEBUG
 		printf("decrypted record: ");
 		hexdump(recvbuf, record_len);
@@ -444,12 +448,8 @@ static void tls13_handshake(int s)
 	printf("\n");
 #endif
 
-	unsigned char client_application_traffic_secret_0[32];
-	unsigned char client_application_traffic_secret_0_key[32];
-	unsigned char client_application_traffic_secret_0_iv[32];
-	hkdf_expand_label(client_application_traffic_secret_0, master_secret, "c ap traffic", transcript_hash, 32, 32);
-	hkdf_expand_label(client_application_traffic_secret_0_key, client_application_traffic_secret_0, "key", NULL, 0, 16);
-	hkdf_expand_label(client_application_traffic_secret_0_iv, client_application_traffic_secret_0, "iv", NULL, 0, 12);
+	struct skiv client_application_traffic;
+	derive_key_iv(&client_application_traffic, master_secret, "c ap traffic", transcript_hash);
 #ifdef DEBUG
 	printf("client_application_traffic_secret_0: ");
 	hexdump(client_application_traffic_secret_0, sizeof(client_application_traffic_secret_0));
@@ -462,12 +462,8 @@ static void tls13_handshake(int s)
 	printf("\n");
 #endif
 
-	unsigned char server_application_traffic_secret_0[32];
-	unsigned char server_application_traffic_secret_0_key[32];
-	unsigned char server_application_traffic_secret_0_iv[32];
-	hkdf_expand_label(server_application_traffic_secret_0, master_secret, "s ap traffic", transcript_hash, 32, 32);
-	hkdf_expand_label(server_application_traffic_secret_0_key, server_application_traffic_secret_0, "key", NULL, 0, 16);
-	hkdf_expand_label(server_application_traffic_secret_0_iv, server_application_traffic_secret_0, "iv", NULL, 0, 12);
+	struct skiv server_application_traffic;
+	derive_key_iv(&server_application_traffic, master_secret, "s ap traffic", transcript_hash);
 #ifdef DEBUG
 	printf("server_application_traffic_secret_0: ");
 	hexdump(server_application_traffic_secret_0, sizeof(server_application_traffic_secret_0));
@@ -486,7 +482,7 @@ static void tls13_handshake(int s)
 
 	//unsigned char finish_data[32];
 	unsigned char client_finished[58] = {0x17,0x03,0x03,0x00,0x35, 0x14,0x00,0x00,0x20};
-	hkdf_expand_label(client_finished+9, client_handshake_traffic_secret, "finished", NULL, 0, 32);
+	hkdf_expand_label(client_finished+9, client_handshake_traffic.secret, "finished", NULL, 0, 32);
 	hmac_sha256(client_finished+9, client_finished+9, transcript_hash, 32);
 	client_finished[41] = 0x16;
 #ifdef DEBUG
@@ -495,7 +491,7 @@ static void tls13_handshake(int s)
 	printf("\n");
 #endif
 
-	aes_gcm(client_finished, ALG_OP_ENCRYPT, client_handshake_traffic_secret_key, client_handshake_traffic_secret_iv, sizeof(client_finished)-16, 5);
+	aes_gcm(client_finished, ALG_OP_ENCRYPT, &client_handshake_traffic, sizeof(client_finished)-16, 5);
 #ifdef DEBUG
 	printf("client_finished record: ");
 	hexdump(client_finished, sizeof(client_finished));
@@ -509,16 +505,23 @@ static void tls13_handshake(int s)
 	*/
 
 	DBG_ASSERT(sys_setsockopt(s, SOL_TCP, TCP_ULP, "tls", 3) == 0);
-	ktls_set_key(s, TLS_TX, client_application_traffic_secret_0_key, client_application_traffic_secret_0_iv);
-	ktls_set_key(s, TLS_RX, server_application_traffic_secret_0_key, server_application_traffic_secret_0_iv);
+	ktls_set_key(s, TLS_TX, &client_application_traffic);
+	ktls_set_key(s, TLS_RX, &server_application_traffic);
 }
 
-void _start(void)
+void __attribute__ ((noinline)) main(int argc, char *argv[])
 {
 	unsigned char res[32];
 
+	//printf(argv[0]);
+
 #ifdef DEBUG
+	printf(argv[0]);
+	//hexdump(argv, 16);
+	printf("\n");
+
 	printf("Hello, world!\n");
+	sys__exit(0);
 
 
 	hmac_sha256(res, NULL, (unsigned char*)"hello\n", strlen("hello\n")); // expected 5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03
@@ -599,7 +602,6 @@ void _start(void)
 #endif
 			if (record_type == 23) {
 				sys_write(1, recvbuf, ret);
-				// TODO
 			} else {
 #ifdef DEBUG
 				// session tickets, alerts (connection close)
@@ -614,4 +616,10 @@ void _start(void)
 	}
 	
 	sys__exit(0);
+}
+
+void _start(void)
+{
+	void **auxv = __builtin_frame_address(0) + 16; // XXX: you may need to tweak this!
+	main(*(int*)auxv, (char **)auxv+1); 
 }
