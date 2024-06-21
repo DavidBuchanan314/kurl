@@ -5,5 +5,6 @@ CFLAGS := -s -Os -ffreestanding -nostdlib -static -Wl,--omagic -fcf-protection=n
 kurl: kurl.c
 	#gcc -c libc.c -o libc.o  $(CFLAGS) -fno-lto
 	gcc kurl.c -o kurl $(CFLAGS) -flto
+	python3 elf_mangler.py kurl kurl
 	#hexdump -vC kurl
 	wc -c kurl
