@@ -245,9 +245,9 @@ static uint32_t do_dns(void)
 	return ip;
 }
 
-/*
-this version is more correct (on the first read?), but takes like 40 extra bytes
 
+#if 1
+//this version is more correct (on the first read?), but takes like 40 extra bytes
 static void recvall(int s, unsigned char *buf, size_t len)
 {
 	size_t ptr = 0;
@@ -267,7 +267,7 @@ static size_t recv_record(int s)
 	recvall(s, recvbuf+5, msglen);
 	return 5 + msglen;
 }
-*/
+#else
 
 // receive the next record into recvbuf. does not account for record fragmentation.
 // returns number of bytes of recvbuf populated (includes header)
@@ -285,6 +285,7 @@ static size_t recv_record(int s)
 	DBG_ASSERT(ptr == msglen);
 	return ptr;
 }
+#endif
 
 static void ktls_set_key(int s, int direction, struct skiv *ski)
 {

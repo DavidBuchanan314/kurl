@@ -126,3 +126,14 @@ We've even got 320 bytes left for a DNS client.
 Adding the DNS client brought it up to ~3900 bytes, and then some golfing brought it back down to 3768.
 
 And then ~~3744~~ ~~3536~~ ~~3472~~ ~~3432~~ 3232.
+
+## Bonus Features?
+
+Now that I'm comfortably below 4KB, I can think about some enhancements, my dream would be to have something more `curl`-like, which means the ability to pass in a URL. This implies the need for:
+
+- AUXV extraction (normally done by libc before main)
+- basic URL parsing (we can bodge this by passing domain in argv[1] and path in argv[2] but that's a bit unsatisfying)
+- DNS query construction and slightly dynamic response parsing
+- dynamically inserting the hostname and path into the HTTP query
+- dynamically setting the SNI hostname in client_hello (this seems optional for the github pages host, but might not be optional elsewhere)
+- correct recvall logic (not a strict requirement but will increase compat)
