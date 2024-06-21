@@ -379,13 +379,13 @@ static void tls13_handshake(int s)
 	derive_key_iv(&client_handshake_traffic, handshake_secret, 0x73682063, transcript_hash);
 #ifdef DEBUG
 	printf("client_handshake_traffic_secret: ");
-	hexdump(client_handshake_traffic_secret, sizeof(client_handshake_traffic_secret));
+	hexdump(client_handshake_traffic.secret, 32);
 	printf("\n");
 	printf("client_handshake_traffic_secret_key: ");
-	hexdump(client_handshake_traffic_secret_key, 16);
+	hexdump(client_handshake_traffic.key, 16);
 	printf("\n");
 	printf("client_handshake_traffic_secret_iv: ");
-	hexdump(client_handshake_traffic_secret_iv, 12);
+	hexdump(client_handshake_traffic.iv, 12);
 	printf("\n");
 #endif
 
@@ -393,13 +393,13 @@ static void tls13_handshake(int s)
 	derive_key_iv(&server_handshake_traffic, handshake_secret, 0x73682073, transcript_hash);
 #ifdef DEBUG
 	printf("server_handshake_traffic_secret: ");
-	hexdump(server_handshake_traffic_secret, sizeof(server_handshake_traffic_secret));
+	hexdump(server_handshake_traffic.secret, 32);
 	printf("\n");
 	printf("server_handshake_traffic_secret_key: ");
-	hexdump(server_handshake_traffic_secret_key, 16);
+	hexdump(server_handshake_traffic.key, 16);
 	printf("\n");
 	printf("server_handshake_traffic_secret_iv: ");
-	hexdump(server_handshake_traffic_secret_iv, 12);
+	hexdump(server_handshake_traffic.iv, 12);
 	printf("\n");
 #endif
 
@@ -456,13 +456,13 @@ static void tls13_handshake(int s)
 	derive_key_iv(&client_application_traffic, master_secret, 0x70612063, transcript_hash);
 #ifdef DEBUG
 	printf("client_application_traffic_secret_0: ");
-	hexdump(client_application_traffic_secret_0, sizeof(client_application_traffic_secret_0));
+	hexdump(client_application_traffic.secret, 32);
 	printf("\n");
 	printf("client_application_traffic_secret_0_key: ");
-	hexdump(client_application_traffic_secret_0_key, 16);
+	hexdump(client_application_traffic.key, 16);
 	printf("\n");
 	printf("client_application_traffic_secret_0_iv: ");
-	hexdump(client_application_traffic_secret_0_iv, 12);
+	hexdump(client_application_traffic.iv, 12);
 	printf("\n");
 #endif
 
@@ -470,13 +470,13 @@ static void tls13_handshake(int s)
 	derive_key_iv(&server_application_traffic, master_secret, 0x70612073, transcript_hash);
 #ifdef DEBUG
 	printf("server_application_traffic_secret_0: ");
-	hexdump(server_application_traffic_secret_0, sizeof(server_application_traffic_secret_0));
+	hexdump(server_application_traffic.secret, 32);
 	printf("\n");
 	printf("server_application_traffic_secret_0_key: ");
-	hexdump(server_application_traffic_secret_0_key, 16);
+	hexdump(server_application_traffic.key, 16);
 	printf("\n");
 	printf("server_application_traffic_secret_0_iv: ");
-	hexdump(server_application_traffic_secret_0_iv, 12);
+	hexdump(server_application_traffic.iv, 12);
 	printf("\n");
 #endif
 
@@ -525,7 +525,7 @@ void __attribute__ ((noinline)) main(int argc, char *argv[])
 	printf("\n");
 
 	printf("Hello, world!\n");
-	sys__exit(0);
+	//sys__exit(0);
 
 
 	hmac_sha256(res, NULL, (unsigned char*)"hello\n", strlen("hello\n")); // expected 5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03
@@ -553,13 +553,17 @@ void __attribute__ ((noinline)) main(int argc, char *argv[])
 	hexdump(res, sizeof(res));
 	printf("\n");
 
+	struct skiv keyz = {
+		.key = "AAAAAAAAAAAAAAAA",
+		.iv = "AAAAAAAAAAAA"
+	};
 	strcpy((char*)res, "xxABC");
-	aes_gcm(res, ALG_OP_ENCRYPT, (unsigned char*)"AAAAAAAAAAAAAAAA", (unsigned char*)"AAAAAAAAAAAA", 5, 2);
+	aes_gcm(res, ALG_OP_ENCRYPT, &keyz, 5, 2);
 	printf("encrypted: ");
 	hexdump(res, 5+16);
 	printf("\n");
 
-	aes_gcm(res, ALG_OP_DECRYPT, (unsigned char*)"AAAAAAAAAAAAAAAA", (unsigned char*)"AAAAAAAAAAAA", 5+16, 2);
+	aes_gcm(res, ALG_OP_DECRYPT, &keyz, 5+16, 2);
 	printf("decrypted: ");
 	hexdump(res, 5);
 	printf("\n");
