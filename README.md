@@ -124,3 +124,5 @@ That's a TLS client in under 4KB!!!!
 We've even got 320 bytes left for a DNS client.
 
 Adding the DNS client brought it up to ~3900 bytes, and then some golfing brought it back down to 3768.
+
+And then 3744.

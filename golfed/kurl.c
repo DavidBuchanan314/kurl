@@ -15,6 +15,7 @@
 #define SYS_ERRNO ((int){0}) // dummy lvalue
 #include "linux_syscall_support.h"
 
+// these aren't in LSS, for whatever reason
 LSS_INLINE _syscall5(int, setsockopt, int, sockfd, int, level, int, optname, const void*, optval, socklen_t, optlen)
 LSS_INLINE _syscall3(int, bind, int, sockfd, const struct sockaddr *, addr, socklen_t, addrlen)
 LSS_INLINE _syscall3(int, accept, int, sockfd, struct sockaddr *, addr, socklen_t *, addrlen)
@@ -33,9 +34,10 @@ LSS_INLINE _syscall3(int, connect, int, sockfd, const struct sockaddr *, addr, s
 #define DBG_ASSERT(x) do { if (x) {} } while (0)
 #endif
 
-//#define IP_ADDR "93.184.215.14"
+// google dns
 #define DNS_SERVER 0x08080808
-#define PORT 443
+
+#define TLS_PORT 443
 
 /*
 Useful reference: https://github.com/smuellerDD/libkcapi
@@ -97,11 +99,8 @@ size_t strlen(const char *s)
 	return i;
 }
 
-struct cmsghdr *
-__cmsg_nxthdr (struct msghdr *mhdr, struct cmsghdr *cmsg)
-{
-	return (struct cmsghdr *) ((unsigned char *) cmsg + CMSG_ALIGN (cmsg->cmsg_len));
-}
+#undef CMSG_NXTHDR
+#define CMSG_NXTHDR(mhdr, cmsg) ((struct cmsghdr *) ((unsigned char *) cmsg + CMSG_ALIGN(cmsg->cmsg_len)))
 
 // only here for debugging
 #ifdef DEBUG
@@ -223,34 +222,28 @@ static void aes_gcm(unsigned char *buf, int op, unsigned char key[16], unsigned 
 	DBG_ASSERT(sys_read(sfd, buf, reslen) == reslen);
 }
 
-static uint32_t do_dns(void)
+static int do_connect(int sock_type, uint32_t ip, int port)
 {
-	int s = sys_socket(AF_INET, SOCK_DGRAM, 0);
+	int s = sys_socket(AF_INET, sock_type, 0);
 	DBG_ASSERT(s >= 0);
 	struct sockaddr_in sin = {
 		.sin_family = AF_INET,
-		.sin_addr.s_addr = DNS_SERVER,
-		.sin_port = htons(53),
-	};
-	DBG_ASSERT(sys_connect(s, (struct sockaddr*)&sin, sizeof(sin)) == 0);
-	//DBG_ASSERT(sendto(s, DNS_REQ, sizeof(DNS_REQ), 0, (struct sockaddr*)&sin, sizeof(sin)) == sizof(DNS_REQ));
-	DBG_ASSERT(sys_write(s, DNS_REQ, sizeof(DNS_REQ)) == sizeof(DNS_REQ));
-	DBG_ASSERT(sys_read(s, recvbuf, sizeof(recvbuf)) > 0);
-	return *(uint32_t*)(recvbuf+41); // assuming the DNS server uses compression, the first ipv4 addr will be at the same place for a given query response
-}
-
-static int tcp_connect(void)
-{
-	int s = sys_socket(AF_INET, SOCK_STREAM, 0);
-	DBG_ASSERT(s >= 0);
-	struct sockaddr_in sin = {
-		.sin_family = AF_INET,
-		.sin_addr.s_addr = do_dns(),
-		.sin_port = htons(PORT),
+		.sin_addr.s_addr = ip,
+		.sin_port = port,
 	};
 	DBG_ASSERT(sys_connect(s, (struct sockaddr*)&sin, sizeof(sin)) == 0);
 	return s;
 }
+
+static uint32_t do_dns(void)
+{
+	int s = do_connect(SOCK_DGRAM, DNS_SERVER, htons(53));
+	DBG_ASSERT(sys_write(s, DNS_REQ, sizeof(DNS_REQ)) == sizeof(DNS_REQ));
+	DBG_ASSERT(sys_read(s, recvbuf, sizeof(recvbuf)) > 0);
+	uint32_t ip = *(uint32_t*)(recvbuf+41);  // assuming the DNS server uses compression, the first ipv4 addr will be at the same place for a given query response
+	return ip;
+}
+
 
 // receive the next record into recvbuf. does not account for record fragmentation.
 // returns number of bytes of recvbuf populated (includes header)
@@ -544,10 +537,16 @@ void _start(void)
 	printf("\n");
 #endif
 
-	int s = tcp_connect();
+	uint32_t ip = do_dns();
+#ifdef DEBUG
+	printf("ip: ");
+	hexdump((unsigned char*)&ip, 4);
+	printf("\n");
+#endif
+	int s = do_connect(SOCK_STREAM, ip, htons(TLS_PORT));
 	tls13_handshake(s);
 
-	const char REQ[] = "GET / HTTP/1.1\r\nHost: binary.golf\r\nConnection: close\r\n\r\n";
+	const char REQ[] = "GET /5/5 HTTP/1.1\r\nHost: binary.golf\r\nConnection: close\r\n\r\n";
 	DBG_ASSERT(sys_write(s, REQ, strlen(REQ)) == strlen(REQ)); // TODO: sendall?
 	//ssize_t recvlen = recv(s, recvbuf, sizeof(recvbuf), 0);
 	//printf("recvd %ld\n", recvlen);
