@@ -443,7 +443,7 @@ static void tls13_handshake(int s)
 	the transcript buffer. break once the finish record is reached.
 	*/
 	size_t recv_ctr = 0;
-	do {
+	while (1) {
 		size_t record_len = recv_record(s);
 #ifdef DEBUG
 		printf("raw record: ");
@@ -463,10 +463,20 @@ static void tls13_handshake(int s)
 #endif
 		DBG_ASSERT(recvbuf[record_len-16-1] == 22); // encapsulated handshake record (might need to make this a real check?)
 
-		memcpy(transcript_buf+transcript_len, recvbuf+5, record_len-5-16-1); // skip over header, ignore auth tag and final type field
-		transcript_len += record_len-5-16-1;
+		// we need to scan thru until we reach the end, or find a finish record
+		size_t ptr = 5;
+		while (ptr < record_len - 1 - 16) {
+			size_t thislen = (recvbuf[ptr+1]<<16) + (recvbuf[ptr+2]<<8) + recvbuf[ptr+3];
+			memcpy(transcript_buf+transcript_len, recvbuf+ptr, 4+thislen); // skip over header, ignore auth tag and final type field
+			transcript_len += 4+thislen;
+			if (recvbuf[ptr] == 20) {
+				goto found_finished;
+			}
+			ptr += 4+thislen;
+		}
 
-	} while (recvbuf[5] != 20); // "finished"
+	};
+found_finished:
 
 	/* find the new transcript hash */
 	hmac_sha256(transcript_hash, NULL, transcript_buf, transcript_len);
@@ -620,7 +630,7 @@ show_usage:
 	printf("ip: ");
 	hexdump((unsigned char*)&ip, 4);
 	printf("\n");
-	sys__exit(0);
+	//sys__exit(0);
 #endif
 	int s = do_connect(SOCK_STREAM, ip, htons(TLS_PORT));
 	tls13_handshake(s);

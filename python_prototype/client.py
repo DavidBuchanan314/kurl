@@ -89,8 +89,7 @@ class TLSClient:
 			assert(pt[-1] == 22)
 			ptbuf = io.BytesIO(pt[:-1])
 			print(pt.hex())
-			while True:
-				rawtype = ptbuf.read(1)
+			while rawtype := ptbuf.read(1):
 				rawlen = ptbuf.read(3)
 				msglen = int.from_bytes(rawlen, "big")
 				msg = ptbuf.read(msglen)
@@ -226,12 +225,12 @@ class TLSClient:
 				),
 
 				# theory: putting this last will make it easier to build dynamically
-				TLS_Ext_ServerName(
-					servernames=[
-						ServerName(servername=self.hostname)
-					]
-					#servernames=[ServerName(servername="google.com")]
-				),
+				#TLS_Ext_ServerName(
+				#	servernames=[
+				#		ServerName(servername=self.hostname)
+				#	]
+				#	#servernames=[ServerName(servername="google.com")]
+				#),
 			]
 		)
 		record = TLS13(
@@ -250,7 +249,7 @@ if __name__ == "__main__":
 	port = 443
 	hostname = "localhost"
 	port = 1337
-	hostname = "cloudflare.com"
+	hostname = "google.com"
 	port = 443
 
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
