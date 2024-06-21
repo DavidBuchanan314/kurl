@@ -301,9 +301,13 @@ static void ktls_set_key(int s, int direction, struct skiv *ski)
 	DBG_ASSERT(sys_setsockopt(s, SOL_TLS, direction, &crypto_info, sizeof(crypto_info)) == 0);
 }
 
-static void derive_key_iv(struct skiv *ski, unsigned char seed[32], char *ctx, unsigned char transcript_hash[32])
+static void derive_key_iv(struct skiv *ski, unsigned char seed[32], uint32_t ctx, unsigned char transcript_hash[32])
 {
-	hkdf_expand_label(ski->secret, seed, ctx, transcript_hash, 32, 32);
+	unsigned char buf[13];
+	*(uint32_t*)buf = ctx;
+	*(uint64_t *)(buf+4) = 0x6369666661727420; // " traffic"
+	buf[12] = 0;
+	hkdf_expand_label(ski->secret, seed, buf, transcript_hash, 32, 32);
 	hkdf_expand_label(ski->key, ski->secret, "key", NULL, 0, 16);
 	hkdf_expand_label(ski->iv, ski->secret, "iv", NULL, 0, 12);
 }
@@ -372,7 +376,7 @@ static void tls13_handshake(int s)
 
 	/* derive handshake encryption keys */
 	struct skiv client_handshake_traffic;
-	derive_key_iv(&client_handshake_traffic, handshake_secret, "c hs traffic", transcript_hash);
+	derive_key_iv(&client_handshake_traffic, handshake_secret, 0x73682063, transcript_hash);
 #ifdef DEBUG
 	printf("client_handshake_traffic_secret: ");
 	hexdump(client_handshake_traffic_secret, sizeof(client_handshake_traffic_secret));
@@ -386,7 +390,7 @@ static void tls13_handshake(int s)
 #endif
 
 	struct skiv server_handshake_traffic;
-	derive_key_iv(&server_handshake_traffic, handshake_secret, "s hs traffic", transcript_hash);
+	derive_key_iv(&server_handshake_traffic, handshake_secret, 0x73682073, transcript_hash);
 #ifdef DEBUG
 	printf("server_handshake_traffic_secret: ");
 	hexdump(server_handshake_traffic_secret, sizeof(server_handshake_traffic_secret));
@@ -449,7 +453,7 @@ static void tls13_handshake(int s)
 #endif
 
 	struct skiv client_application_traffic;
-	derive_key_iv(&client_application_traffic, master_secret, "c ap traffic", transcript_hash);
+	derive_key_iv(&client_application_traffic, master_secret, 0x70612063, transcript_hash);
 #ifdef DEBUG
 	printf("client_application_traffic_secret_0: ");
 	hexdump(client_application_traffic_secret_0, sizeof(client_application_traffic_secret_0));
@@ -463,7 +467,7 @@ static void tls13_handshake(int s)
 #endif
 
 	struct skiv server_application_traffic;
-	derive_key_iv(&server_application_traffic, master_secret, "s ap traffic", transcript_hash);
+	derive_key_iv(&server_application_traffic, master_secret, 0x70612073, transcript_hash);
 #ifdef DEBUG
 	printf("server_application_traffic_secret_0: ");
 	hexdump(server_application_traffic_secret_0, sizeof(server_application_traffic_secret_0));
