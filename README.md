@@ -1,6 +1,6 @@
 # kurl
 
-This is repo hosts my WIP entry to [BGGP5](#TODO). This README acts as a dev log of sorts.
+This is repo hosts my WIP entry to [BGGP5](#TODO). This README acts as a dev log of sorts (It's a bit of an un-edited stream of consciousness right now, I'll do a proper writeup later. hopefully).
 
 The main goal of BGGP5 is to download the file at [https://binary.golf/5/5](https://binary.golf/5/5) and display its contents, using less than 4KB of code (stored in whatever format you like).
 
