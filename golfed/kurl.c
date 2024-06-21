@@ -272,8 +272,10 @@ static uint32_t do_dns(const char *hostname)
 	int s = do_connect(SOCK_DGRAM, DNS_SERVER, htons(53));
 	DBG_ASSERT(sys_write(s, pkt, idx) == idx);
 	DBG_ASSERT(sys_read(s, recvbuf, sizeof(recvbuf)) > 0);
-	uint32_t ip = *(uint32_t*)(recvbuf+idx+12);  // assuming the DNS server uses compression, the first ipv4 addr will be at the same relative offset
-	// the "formula" is 30 + strlen(domain)
+
+	// assuming the DNS server uses compression, the first ipv4 addr will
+	// always be at the same relative offset
+	uint32_t ip = *(uint32_t*)(recvbuf+idx+12); 
 	return ip;
 }
 
@@ -612,8 +614,9 @@ void __attribute__ ((noinline)) main(int argc, char *argv[])
 	int s = do_connect(SOCK_STREAM, ip, htons(TLS_PORT));
 	tls13_handshake(s);
 
-	const char REQ[] = "GET /5/5 HTTP/1.1\r\nHost: binary.golf\r\nConnection: close\r\n\r\n";
-	DBG_ASSERT(sys_write(s, REQ, strlen(REQ)) == strlen(REQ)); // TODO: sendall?
+	char req[1024];// = "GET /5/5 HTTP/1.1\r\nHost: binary.golf\r\nConnection: close\r\n\r\n";
+	char *req_end = strcpy(strcpy(strcpy(strcpy(strcpy(req, "GET "), argv[2]), " HTTP/1.1\r\nHost: "), argv[1]), "\r\nConnection: close\r\n\r\n");
+	DBG_ASSERT(sys_write(s, req, req_end-req) == strlen(req)); // TODO: sendall?
 	//ssize_t recvlen = recv(s, recvbuf, sizeof(recvbuf), 0);
 	//printf("recvd %ld\n", recvlen);
 
