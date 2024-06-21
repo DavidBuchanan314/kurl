@@ -1,4 +1,4 @@
-#define DEBUG 1
+//#define DEBUG 1
 
 // google dns
 #define DNS_SERVER 0x08080808
@@ -274,11 +274,20 @@ static uint32_t do_dns(const char *hostname)
 
 	int s = do_connect(SOCK_DGRAM, DNS_SERVER, htons(53));
 	DBG_ASSERT(sys_write(s, pkt, idx) == idx);
-	DBG_ASSERT(sys_read(s, recvbuf, sizeof(recvbuf)) > 0);
+	size_t tmp = sys_read(s, recvbuf, sizeof(recvbuf));
+	DBG_ASSERT(tmp > 0);
 
-	// assuming the DNS server uses compression, the first ipv4 addr will
-	// always be at the same relative offset
-	uint32_t ip = *(uint32_t*)(recvbuf+idx+12); 
+#ifdef DEBUG
+	printf("dns res: ");
+	hexdump(recvbuf, tmp);
+	printf("\n");
+#endif
+
+	// scan for an "A" response (this is just a heuristic lol)
+	while (*(uint32_t*)(recvbuf+idx) != 0x01000100) idx++;
+
+	// skip over ttl, data length
+	uint32_t ip = *(uint32_t*)(recvbuf+idx+10); 
 	return ip;
 }
 

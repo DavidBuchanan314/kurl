@@ -149,3 +149,5 @@ Google (and others) are sending some of their handshake responses bundled togeth
 ## DNS CNAME
 
 New problem: DNS responses involving CNAME don't work properly. Example: `old.reddit.com`
+
+Solution: a better response "parsing" heuristic.
