@@ -548,13 +548,24 @@ static void tls13_handshake(int s)
 	ktls_set_key(s, TLS_RX, &server_application_traffic);
 }
 
-void __attribute__ ((noinline)) main(int argc, char *argv[])
+int __attribute__ ((noinline)) main(int argc, char *argv[])
 {
-	unsigned char res[32];
-
-	//printf(argv[0]);
+	if (argc != 2) {
+show_usage:
+		sys_write(1, "USAGE: ./kurl https://url\n", 26);
+		return 0;
+	}
+	if (*(uint64_t*)argv[1] != 0x2f2f3a7370747468) { // "https://"
+		goto show_usage;
+	}
+	unsigned char *hostname = argv[1]+8; // len("https://")
+	unsigned char *path = hostname;
+	while (*path && *path != '/') path++;
+	if (*path) *path++ = 0; // also handles empty path (hostname with no trailing slash)
 
 #ifdef DEBUG
+	unsigned char res[32];
+
 	printf(argv[0]);
 	//hexdump(argv, 16);
 	printf("\n");
@@ -604,7 +615,7 @@ void __attribute__ ((noinline)) main(int argc, char *argv[])
 	printf("\n");
 #endif
 
-	uint32_t ip = do_dns(argv[1]);
+	uint32_t ip = do_dns(hostname);
 #ifdef DEBUG
 	printf("ip: ");
 	hexdump((unsigned char*)&ip, 4);
@@ -615,7 +626,7 @@ void __attribute__ ((noinline)) main(int argc, char *argv[])
 	tls13_handshake(s);
 
 	char req[1024];// = "GET /5/5 HTTP/1.1\r\nHost: binary.golf\r\nConnection: close\r\n\r\n";
-	char *req_end = strcpy(strcpy(strcpy(strcpy(strcpy(req, "GET "), argv[2]), " HTTP/1.1\r\nHost: "), argv[1]), "\r\nConnection: close\r\n\r\n");
+	char *req_end = strcpy(strcpy(strcpy(strcpy(strcpy(req, "GET /"), path), " HTTP/1.1\r\nHost: "), hostname), "\r\nConnection: close\r\n\r\n");
 	DBG_ASSERT(sys_write(s, req, req_end-req) == strlen(req)); // TODO: sendall?
 	//ssize_t recvlen = recv(s, recvbuf, sizeof(recvbuf), 0);
 	//printf("recvd %ld\n", recvlen);
@@ -660,11 +671,11 @@ void __attribute__ ((noinline)) main(int argc, char *argv[])
 
 	}
 	
-	sys__exit(0);
+	return 0;
 }
 
 void _start(void)
 {
 	void **auxv = __builtin_frame_address(0) + 16; // XXX: you may need to tweak this!
-	main(*(int*)auxv, (char **)auxv+1); 
+	sys__exit(main(*(int*)auxv, (char **)auxv+1)); 
 }
