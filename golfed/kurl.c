@@ -138,19 +138,12 @@ static int alg_sock(const char *type, const char *name)
 	return res;
 }
 
-static void sha256(unsigned char res[32], unsigned char *buf, size_t len)
-{	
-	int sfd = alg_sock("hash", "sha256");
-	DBG_ASSERT(sys_write(sfd, buf, len) == (ssize_t)len);
-	DBG_ASSERT(sys_read(sfd, res, 32) == 32);
-	// XXX: leaks sfd
-}
-
 // aka hkdf_extract(salt, ikm)
+// if key==NULL, it's just regular sha256
 static void hmac_sha256(unsigned char *res, unsigned char key[32], unsigned char *data, size_t len)
 {
-	int sfd = alg_sock("hash", "hmac(sha256)");
-	sys_setsockopt(algfd, SOL_ALG, ALG_SET_KEY, key, 32);
+	int sfd = alg_sock("hash", key ? "hmac(sha256)" : "sha256");
+	if (key) sys_setsockopt(algfd, SOL_ALG, ALG_SET_KEY, key, 32);
 	DBG_ASSERT(sys_write(sfd, data, len) == (ssize_t)len);
 	DBG_ASSERT(sys_read(sfd, res, 32) == 32);
 	// XXX: leaks sfd
@@ -335,7 +328,7 @@ static void tls13_handshake(int s)
 
 	/* grab the current transcript hash state */
 	//DBG_ASSERT(recv(transcript, transcript_hash, sizeof(transcript_hash), MSG_MORE) == sizeof(transcript_hash));
-	sha256(transcript_hash, transcript_buf, transcript_len);
+	hmac_sha256(transcript_hash, NULL, transcript_buf, transcript_len);
 
 #ifdef DEBUG
 	printf("transcript hash (client_hello||server_hello): ");
@@ -433,7 +426,7 @@ static void tls13_handshake(int s)
 	} while (recvbuf[5] != 20); // "finished"
 
 	/* find the new transcript hash */
-	sha256(transcript_hash, transcript_buf, transcript_len);
+	hmac_sha256(transcript_hash, NULL, transcript_buf, transcript_len);
 #ifdef DEBUG
 	printf("final transcript_hash: ");
 	hexdump(transcript_hash, sizeof(transcript_hash));
@@ -442,7 +435,7 @@ static void tls13_handshake(int s)
 
 	/* now we have everything required to derive the traffic keys */
 	unsigned char master_secret[32];
-	sha256(master_secret, (unsigned char*)"", 0); // buffer reuse
+	hmac_sha256(master_secret, NULL, (unsigned char*)"", 0); // buffer reuse
 	hkdf_expand_label(master_secret, handshake_secret, "derived", master_secret, 32, 32); // buffer reuse
 	hmac_sha256(master_secret, master_secret, H0, 32);
 #ifdef DEBUG
@@ -528,7 +521,7 @@ void _start(void)
 	printf("Hello, world!\n");
 
 
-	sha256(res, (unsigned char*)"hello\n", strlen("hello\n")); // expected 5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03
+	hmac_sha256(res, NULL, (unsigned char*)"hello\n", strlen("hello\n")); // expected 5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03
 	printf("test sha256: ");
 	hexdump(res, sizeof(res));
 	printf("\n");
