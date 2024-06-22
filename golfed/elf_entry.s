@@ -3,7 +3,7 @@
 This file defines a 112-byte aarch64 static ELF header, loadble by Linux.
 It features overlapping ehdr and phdr, but the overlap isn't very aggressive
 (only 8 overlapping bytes). The remaining "holes" in the headers are used to
-write a minimal _start function, which extracts argc and argv from auxv, calls
+write a minimal _start function, which extracts argc and argv from AUXV, calls
 main, and then cleanly exits with whatever main() returned.
 
 All the code in this file gets stored in the .init segment. Normally this would
@@ -15,8 +15,13 @@ before everything else we care about. Rather than mess around with custom linker
 scripts to emit a flat binary, the intention is to compile to a regular ELF,
 then slice our custom golfed ELF out of the "container" ELF file.
 
+As a bonus, the "outer" ELF retains it's original un-mangled headers and symbols,
+making it convenient to debug and analyse.
+
 NOTE: p_filesz and p_memsz calculations are hacky, idk a better way. __bss_start__
 and __bss_end__ may have different names depending on whatever linker script you use
+
+References: https://tmpout.sh/2/11.html (We use the "0x38 Overlay")
 
 */
 
