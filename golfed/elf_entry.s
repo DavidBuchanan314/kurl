@@ -39,8 +39,8 @@ phdr_start:
 .word 7         // p_flags (RWX)
 .dword 0        // p_offset
 .dword elf_base // p_vaddr
-// p_paddr:
 
+// p_paddr:
 nearly_call_main:
 sub        sp, sp, #0x10
 b          call_main
