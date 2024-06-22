@@ -1,4 +1,24 @@
-// there's nothing else in the init section, so this ensures we go first, without a linker script
+/*
+
+This file defines a 112-byte aarch64 static ELF header, loadble by Linux.
+It features overlapping ehdr and phdr, but the overlap isn't very aggressive
+(only 8 overlapping bytes). The remaining "holes" in the headers are used to
+write a minimal _start function, which extracts argc and argv from auxv, calls
+main, and then cleanly exits with whatever main() returned.
+
+All the code in this file gets stored in the .init segment. Normally this would
+be occupied by libc init stuff (crt), but the expectation here is that you're
+compiling in freestanding mode without a libc.
+
+Since .init gets linked ahead of .text (etc.), we mostly-guarantee it'll come
+before everything else we care about. Rather than mess around with custom linker
+scripts to emit a flat binary, the intention is to compile to a regular ELF,
+then slice our custom golfed ELF out of the "container" ELF file.
+
+*/
+
+
+// there's nothing else in the init section, so this ensures we go first, without needing a custom linker script
 .section .init
 
 //.globl _start
