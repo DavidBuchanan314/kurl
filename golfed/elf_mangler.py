@@ -21,7 +21,7 @@ load_end = load_offset + file_size
 
 print(f"[*] last loaded byte @ {hex(load_end)}")
 
-truncated = orig[:load_end].rstrip(b"\x00") # strip trailing zeroes
+truncated = orig[:load_end]#.rstrip(b"\x00") # strip trailing zeroes
 
 print(f"[+] trimmed {len(orig) - len(truncated)} bytes ({len(orig)} -> {len(truncated)})")
 

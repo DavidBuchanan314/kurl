@@ -542,7 +542,10 @@ found_finished:
 	*/
 
 	//unsigned char finish_data[32];
-	unsigned char client_finished[58] = {0x17,0x03,0x03,0x00,0x35, 0x14,0x00,0x00,0x20};
+	unsigned char client_finished[58];// = {0x17,0x03,0x03,0x00,0x35, 0x14,0x00,0x00,0x20};
+	*(uint32_t*)(client_finished+0) = 0x00030317;
+	*(uint32_t*)(client_finished+4) = 0x00001435;
+	client_finished[8] = 0x20;
 	hkdf_expand_label(client_finished+9, client_handshake_traffic.secret, "finished", NULL, 0, 32);
 	hmac_sha256(client_finished+9, client_finished+9, transcript_hash, 32);
 	client_finished[41] = 0x16;

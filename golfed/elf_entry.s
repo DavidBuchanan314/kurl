@@ -15,6 +15,8 @@ before everything else we care about. Rather than mess around with custom linker
 scripts to emit a flat binary, the intention is to compile to a regular ELF,
 then slice our custom golfed ELF out of the "container" ELF file.
 
+NOTE: p_filesz and p_memsz calculations are hacky, idk a better way.
+
 */
 
 
@@ -65,9 +67,9 @@ nearly_call_main:
 sub        sp, sp, #0x10
 b          call_main
 
-.dword 0x1000   // p_filesz (overkill since we don't know the real value)
-.dword 0x100000 // p_memsz  (likewise)
-.dword 0x10000  // p_align (we really are aligned to this)
+.dword __bss_start__-elf_base   // p_filesz
+.dword _bss_end__-elf_base      // p_memsz
+.dword 0x10000                  // p_align (we really are aligned to this)
 
 
 
