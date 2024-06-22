@@ -15,7 +15,8 @@ before everything else we care about. Rather than mess around with custom linker
 scripts to emit a flat binary, the intention is to compile to a regular ELF,
 then slice our custom golfed ELF out of the "container" ELF file.
 
-NOTE: p_filesz and p_memsz calculations are hacky, idk a better way.
+NOTE: p_filesz and p_memsz calculations are hacky, idk a better way. __bss_start__
+and __bss_end__ may have different names depending on whatever linker script you use
 
 */
 
@@ -23,8 +24,7 @@ NOTE: p_filesz and p_memsz calculations are hacky, idk a better way.
 // there's nothing else in the init section, so this ensures we go first, without needing a custom linker script
 .section .init
 
-//.globl _start
-.extern _start
+.globl _start
 .extern main
 
 // align to the next 64k boundary (16k would be enough on my system, but 64k should offer maximum compat)
@@ -68,7 +68,7 @@ sub        sp, sp, #0x10
 b          call_main
 
 .dword __bss_start__-elf_base   // p_filesz
-.dword _bss_end__-elf_base      // p_memsz
+.dword __bss_end__-elf_base      // p_memsz
 .dword 0x10000                  // p_align (we really are aligned to this)
 
 
