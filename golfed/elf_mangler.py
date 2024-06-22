@@ -28,5 +28,7 @@ print(f"[+] trimmed {len(orig) - len(truncated)} bytes ({len(orig)} -> {len(trun
 # trim original ELF headers!
 truncated = truncated[0x10000:]
 
+# TODO: fix up p_filesz and p_memsz
+
 with open(sys.argv[2], "wb") as outf:
 	outf.write(truncated)
