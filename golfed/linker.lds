@@ -56,6 +56,7 @@ SECTIONS
   .plt            : ALIGN(16) { *(.plt) *(.iplt) }
   .text           :
   {
+    *(.my_elf_headers)
     *(.text.unlikely .text.*_unlikely .text.unlikely.*)
     *(.text.exit .text.exit.*)
     *(.text.startup .text.startup.*)

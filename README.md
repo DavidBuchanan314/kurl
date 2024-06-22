@@ -154,6 +154,8 @@ Solution: a better response "parsing" heuristic.
 
 ## ELF Golfing
 
-I was able to save 351 bytes by simply cutting off the end of the file (see `elf_mangler.py`), which included the section headers and strtab (i.e. data not necessary at runtime).
+I was able to save 352 bytes by simply cutting off the end of the file (see `elf_mangler.py`), which included the section headers and strtab (i.e. data not necessary at runtime).
 
 The next piece of cruft is the `GNU_STACK` program header, which is put there by either gcc or ld (not sure). I can't figure out how to make it not do that. It might be time for a custom linker script?
+
+Yup, a custom linker script solved it. I believe there's some more bytes on the table through overlapping the ELF header and program header, and *maybe* putting the entrypoint in the headers too.

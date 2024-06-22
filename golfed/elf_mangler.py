@@ -8,7 +8,8 @@ with open(sys.argv[1], "rb") as inf:
 	orig = bytearray(inf.read())
 
 phoff = int.from_bytes(orig[0x20:0x20+8], "little")
-orig[0x28:0x28+8] = bytes(8) # nullify shoff
+orig[0x28:0x28+14] = bytes(14) # nullify shoff
+orig[0x3a:0x40] = bytes(6)
 
 print(f"[*] phoff = {hex(phoff)}")
 
@@ -20,9 +21,12 @@ load_end = load_offset + file_size
 
 print(f"[*] last loaded byte @ {hex(load_end)}")
 
-truncated = orig[:load_end]
+truncated = orig[:load_end].rstrip(b"\x00") # strip trailing zeroes
 
 print(f"[+] trimmed {len(orig) - len(truncated)} bytes ({len(orig)} -> {len(truncated)})")
+
+# trim original ELF headers!
+truncated = truncated[0x10000:]
 
 with open(sys.argv[2], "wb") as outf:
 	outf.write(truncated)

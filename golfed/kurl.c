@@ -570,7 +570,7 @@ found_finished:
 	ktls_set_key(s, TLS_RX, &server_application_traffic);
 }
 
-static int __attribute__ ((noinline)) main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	if (argc != 2) {
 show_usage:
@@ -696,9 +696,11 @@ show_usage:
 	return 0;
 }
 
+/*
 void _start(void)
 {
 	void **auxv = __builtin_frame_address(0) + 16; // XXX: you may need to tweak this!
 	sys__exit(main(*(int*)auxv, (char **)auxv+1)); 
 	__builtin_unreachable();
 }
+*/
