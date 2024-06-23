@@ -15,10 +15,10 @@ before everything else we care about. Rather than mess around with custom linker
 scripts to emit a flat binary, the intention is to compile to a regular ELF,
 then slice our custom golfed ELF out of the "container" ELF file.
 
-As a bonus, the "outer" ELF retains it's original un-mangled headers and symbols,
+As a bonus, the outer ELF retains the original un-mangled headers and symbols,
 making it convenient to debug and analyse.
 
-NOTE: p_filesz and p_memsz calculations are hacky, idk a better way. __bss_start__
+NOTE: p_filesz and p_memsz calculations are hacky. __bss_start__
 and __bss_end__ may have different names depending on whatever linker script you use
 
 References: https://tmpout.sh/2/11.html (We use the "0x38 Overlay")

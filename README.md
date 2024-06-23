@@ -159,3 +159,5 @@ I was able to save 352 bytes by simply cutting off the end of the file (see `elf
 The next piece of cruft is the `GNU_STACK` program header, which is put there by either gcc or ld (not sure). I can't figure out how to make it not do that. It might be time for a custom linker script?
 
 Yup, a custom linker script solved it. I believe there's some more bytes on the table through overlapping the ELF header and program header, and *maybe* putting the entrypoint in the headers too.
+
+If I write the headers and `_start` in asm, I can have it call `main` and still have the bulk of my code written in C. I implemented this and it works great (see `elf_entry.s`), now we're down to 3071 bytes.
