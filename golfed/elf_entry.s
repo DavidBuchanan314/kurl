@@ -36,23 +36,23 @@ References: https://tmpout.sh/2/11.html (We use the "0x38 Overlay")
 .p2align 16
 
 // elf64_ehdr
-elf_base:
+.Lelf_base:
 .ascii "\x7f" "ELF" // e_ident
 
 _start:
 ldr        w0,[sp]
 add        x1, sp, #0x08
-b          nearly_call_main
+b          .Lnearly_call_main
 
 .hword 2    // e_type
 .hword 0xb7 // e_machine
 .word 1     // e_version
 
 .dword _start // e_entry
-.dword phdr_start-elf_base     // e_phoff (offset from elf base)
+.dword .Lphdr_start-.Lelf_base     // e_phoff (offset from elf base)
 
 // e_shoff, e_flags:
-call_main:
+.Lcall_main:
 bl         main
 mov        x8,#0x5d
 svc        0x0      // sys__exit
@@ -61,19 +61,19 @@ svc        0x0      // sys__exit
 .hword 0x38  // e_phentsize
 
 // elf64_phdr
-phdr_start:
+.Lphdr_start:
 .word 1         // e_phnum, p_type (PT_LOAD)
 .word 7         // p_flags (RWX)
 .dword 0        // p_offset
-.dword elf_base // p_vaddr
+.dword .Lelf_base // p_vaddr
 
 // p_paddr:
-nearly_call_main:
+.Lnearly_call_main:
 sub        sp, sp, #0x10
-b          call_main
+b          .Lcall_main
 
-.dword __bss_start__-elf_base   // p_filesz
-.dword __bss_end__-elf_base      // p_memsz
+.dword __bss_start__-.Lelf_base   // p_filesz
+.dword __bss_end__-.Lelf_base      // p_memsz
 .dword 0x10000                  // p_align (we really are aligned to this)
 
 

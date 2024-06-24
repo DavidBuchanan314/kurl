@@ -190,18 +190,25 @@ static void aes_gcm(unsigned char *buf, int op, struct skiv *ski, size_t len, si
 	sys_setsockopt(algfd, SOL_ALG, ALG_SET_AEAD_AUTHSIZE, NULL, 16);
 	sys_setsockopt(algfd, SOL_ALG, ALG_SET_KEY, ski->key, 16);
 
-	char cbuf[CMSG_SPACE(4) + CMSG_SPACE(4) + CMSG_SPACE(4+12)] = {0};
+	char cbuf[CMSG_SPACE(4) + CMSG_SPACE(4) + CMSG_SPACE(4+12)];// = {0};
 	struct kernel_iovec iov = {
 		.iov_base = buf,
 		.iov_len = len,
 	};
-	struct kernel_msghdr msg = {
+	struct kernel_msghdr msg;/* = {
 		.msg_control = cbuf,
 		.msg_controllen = sizeof(cbuf),
 
 		.msg_iov = &iov,
 		.msg_iovlen = 1,
-	};
+	};*/
+	msg.msg_namelen = 0;
+	msg.msg_control = cbuf;
+	msg.msg_controllen = sizeof(cbuf);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	//msg.msg_flags = 0;
+
 	struct cmsghdr *cmsg;
 
 	cmsg = CMSG_FIRSTHDR(&msg);
@@ -661,7 +668,8 @@ show_usage:
 	while (ret > 0)
 	{
 		char cmsg[CMSG_SPACE(sizeof(unsigned char))];
-		struct kernel_msghdr msg = {0};
+		struct kernel_msghdr msg;// = {0};
+		msg.msg_namelen = 0;
 		msg.msg_control = cmsg;
 		msg.msg_controllen = sizeof(cmsg);
 
@@ -671,6 +679,7 @@ show_usage:
 
 		msg.msg_iov = &msg_iov;
 		msg.msg_iovlen = 1;
+		msg.msg_flags = 0;
 
 		ret = sys_recvmsg(s, &msg, 0);
 		DBG_ASSERT(ret >= 0);
